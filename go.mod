@@ -216,3 +216,5 @@ replace github.com/cometbft/cometbft => github.com/osmosis-labs/cometbft v0.37.2
 replace github.com/CosmWasm/wasmd => github.com/osmosis-labs/wasmd v0.45.0-osmo
 
 replace github.com/cosmos/cosmos-proto => github.com/cosmos/cosmos-proto v1.0.0-beta.2
+
+replace golang.org/x/exp => golang.org/x/exp v0.0.0-20230711153332-06a737ee72cb
