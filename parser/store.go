@@ -1,8 +1,11 @@
 package parser
 
 import (
+	db "github.com/cometbft/cometbft-db"
+	tmstore "github.com/cometbft/cometbft/store"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/store/rootmulti"
+	store "github.com/cosmos/cosmos-sdk/store/types"
 	"github.com/cosmos/cosmos-sdk/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
@@ -14,8 +17,6 @@ import (
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	evidencetypes "github.com/cosmos/cosmos-sdk/x/evidence/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
-	mintkeeper "github.com/cosmos/cosmos-sdk/x/mint/keeper"
-	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	paramskeeper "github.com/cosmos/cosmos-sdk/x/params/keeper"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	slashingkeeper "github.com/cosmos/cosmos-sdk/x/slashing/keeper"
@@ -23,14 +24,17 @@ import (
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	upgradetypes "github.com/cosmos/cosmos-sdk/x/upgrade/types"
-	ibctransfertypes "github.com/cosmos/ibc-go/v2/modules/apps/transfer/types"
-	ibchost "github.com/cosmos/ibc-go/v2/modules/core/24-host"
+	icahosttypes "github.com/cosmos/ibc-go/v7/modules/apps/27-interchain-accounts/host/types"
+	ibctransfertypes "github.com/cosmos/ibc-go/v7/modules/apps/transfer/types"
+	"github.com/osmosis-labs/osmosis/v21/app"
+	mintkeeper "github.com/osmosis-labs/osmosis/v21/x/mint/keeper"
+	minttypes "github.com/osmosis-labs/osmosis/v21/x/mint/types"
+	epochskeeper "github.com/osmosis-labs/osmosis/x/epochs/keeper"
+	epochstypes "github.com/osmosis-labs/osmosis/x/epochs/types"
 	"github.com/syndtr/goleveldb/leveldb/opt"
-	tmstore "github.com/tendermint/tendermint/store"
-	db "github.com/tendermint/tm-db"
 )
 
-func LoadDataStores(dbDir string, keys map[string]*types.KVStoreKey) (
+func LoadDataStores(dbDir string, keys map[string]*store.KVStoreKey) (
 	appStore *rootmulti.Store,
 	blockStore *tmstore.BlockStore,
 ) {
@@ -54,7 +58,7 @@ func LoadDataStores(dbDir string, keys map[string]*types.KVStoreKey) (
 	blockStore = tmstore.NewBlockStore(blockStoreDB)
 
 	for _, value := range keys {
-		appStore.MountStoreWithDB(value, sdk.StoreTypeIAVL, nil)
+		appStore.MountStoreWithDB(value, store.StoreTypeIAVL, nil)
 	}
 
 	// Load the latest version in the state
@@ -74,7 +78,7 @@ func CreateKeepers(marshaler *codec.ProtoCodec) (
 	mk *mintkeeper.Keeper,
 	dk *distrkeeper.Keeper,
 	slk *slashingkeeper.Keeper,
-	keys map[string]*types.KVStoreKey,
+	keys map[string]*store.KVStoreKey,
 ) {
 
 	// todo allow for other keys to be mounted
@@ -87,7 +91,7 @@ func CreateKeepers(marshaler *codec.ProtoCodec) (
 		slashingtypes.StoreKey,
 		govtypes.StoreKey,
 		paramstypes.StoreKey,
-		ibchost.StoreKey,
+		icahosttypes.StoreKey,
 		upgradetypes.StoreKey,
 		evidencetypes.StoreKey,
 		ibctransfertypes.StoreKey,
@@ -112,6 +116,10 @@ func CreateKeepers(marshaler *codec.ProtoCodec) (
 		blockedAddrs[authtypes.NewModuleAddress(acc).String()] = !allowedReceivingModAcc[acc]
 	}
 
+	EpochsKeeper := epochskeeper.NewKeeper(keys[epochstypes.StoreKey])
+
+	cdc := app.MakeEncodingConfig().Amino
+
 	paramsKeeper := paramskeeper.NewKeeper(
 		marshaler,
 		nil,
@@ -122,17 +130,18 @@ func CreateKeepers(marshaler *codec.ProtoCodec) (
 	AccountKeeper := authkeeper.NewAccountKeeper(
 		marshaler,
 		keys[authtypes.StoreKey],
-		paramsKeeper.Subspace(authtypes.ModuleName),
 		authtypes.ProtoBaseAccount,
 		maccPerms,
+		"osmo",
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	)
 
 	BankKeeper := bankkeeper.NewBaseKeeper(
 		marshaler,
 		keys[banktypes.StoreKey],
 		AccountKeeper,
-		paramsKeeper.Subspace(banktypes.ModuleName),
 		blockedAddrs,
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	)
 
 	StakingKeeper := stakingkeeper.NewKeeper(
@@ -140,41 +149,41 @@ func CreateKeepers(marshaler *codec.ProtoCodec) (
 		keys[stakingtypes.StoreKey],
 		AccountKeeper,
 		BankKeeper,
-		paramsKeeper.Subspace(stakingtypes.ModuleName),
-	)
-
-	MintKeeper := mintkeeper.NewKeeper(
-		marshaler,
-		keys[minttypes.StoreKey],
-		paramsKeeper.Subspace(minttypes.ModuleName),
-		&StakingKeeper,
-		AccountKeeper,
-		BankKeeper,
-		authtypes.FeeCollectorName,
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	)
 
 	DistrKeeper := distrkeeper.NewKeeper(
 		marshaler,
 		keys[distrtypes.StoreKey],
-		paramsKeeper.Subspace(distrtypes.ModuleName),
 		AccountKeeper,
 		BankKeeper,
-		&StakingKeeper,
+		StakingKeeper,
 		authtypes.FeeCollectorName,
-		blockedAddrs,
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+	)
+
+	MintKeeper := mintkeeper.NewKeeper(
+		keys[minttypes.StoreKey],
+		paramsKeeper.Subspace(minttypes.ModuleName),
+		AccountKeeper,
+		BankKeeper,
+		DistrKeeper,
+		EpochsKeeper,
+		authtypes.FeeCollectorName,
 	)
 
 	SlashingKeeper := slashingkeeper.NewKeeper(
 		marshaler,
+		cdc,
 		keys[slashingtypes.StoreKey],
-		&StakingKeeper,
-		paramsKeeper.Subspace(slashingtypes.ModuleName),
+		StakingKeeper,
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	)
 
 	return &paramsKeeper,
 		&AccountKeeper,
 		&BankKeeper,
-		&StakingKeeper,
+		StakingKeeper,
 		&MintKeeper,
 		&DistrKeeper,
 		&SlashingKeeper,

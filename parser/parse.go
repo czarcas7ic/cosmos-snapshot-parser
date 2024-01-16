@@ -4,17 +4,16 @@ import (
 	"database/sql"
 	"fmt"
 
+	log "github.com/cometbft/cometbft/libs/log"
+	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	tmstore "github.com/cometbft/cometbft/store"
 	"github.com/cosmos/cosmos-sdk/codec"
-	"github.com/cosmos/cosmos-sdk/server"
 	"github.com/cosmos/cosmos-sdk/store/rootmulti"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	distrkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
-	"github.com/rs/zerolog/log"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
-	tmstore "github.com/tendermint/tendermint/store"
 
 	"github.com/PaddyMc/cosmos-snapshot-parser/database"
 )
@@ -84,8 +83,7 @@ func strat(
 		appStore,
 		tmproto.Header{ChainID: ""},
 		true,
-		// TODO: fix this error...
-		server.ZeroLogWrapper{log.Logger},
+		log.NewNopLogger(),
 	)
 
 	blockHeight := blockStore.Height()
@@ -120,8 +118,7 @@ func strat(
 			appStore,
 			tmproto.Header{ChainID: ""},
 			true,
-			// TODO: fix this error...
-			server.ZeroLogWrapper{log.Logger},
+			log.NewNopLogger(),
 		)
 
 		// TODO: params use amino encoding...

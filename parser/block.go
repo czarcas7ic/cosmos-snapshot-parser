@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	tmstore "github.com/cometbft/cometbft/store"
 	"github.com/cosmos/cosmos-sdk/codec"
-	tmstore "github.com/tendermint/tendermint/store"
 
 	"github.com/PaddyMc/cosmos-snapshot-parser/database"
 )

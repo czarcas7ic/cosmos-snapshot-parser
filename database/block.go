@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	tx "github.com/cosmos/cosmos-sdk/types/tx"
 	"github.com/lib/pq"
-	"github.com/tendermint/tendermint/types"
 )
 
 // createPartitionIfNotExists creates a new partition having the given partition id if not existing
